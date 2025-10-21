@@ -1,0 +1,44 @@
+name: Spin Up n8n Server
+
+on:
+  workflow_dispatch: # allows manual trigger
+  push:
+    branches:
+      - main
+
+jobs:
+  start-n8n:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start Docker service
+        run: |
+          sudo service docker start
+          docker info
+
+      - name: Run n8n container
+        run: |
+          docker run -d \
+            --name n8n \
+            -p 5678:5678 \
+            -v ${{ github.workspace }}/.n8n:/home/node/.n8n \
+            -e N8N_BASIC_AUTH_ACTIVE=true \
+            -e N8N_BASIC_AUTH_USER=${{ secrets.N8N_USER }} \
+            -e N8N_BASIC_AUTH_PASSWORD=${{ secrets.N8N_PASSWORD }} \
+            n8nio/n8n:latest
+
+      - name: Wait for n8n to start
+        run: |
+          for i in {1..30}; do
+            if curl -fs http://localhost:5678 >/dev/null; then
+              echo "n8n is up!"
+              exit 0
+            fi
+            echo "Waiting for n8n..."
+            sleep 3
+          done
+          echo "n8n failed to start"
+          exit 1
